@@ -170,7 +170,7 @@ attrs = ['ISOA2_code']
 
 # Make a column layout of widgetbox(slider) and plot, and add it to the current document
 
-layout = column(row(p, divimg), table)
+layout = column(row(p, divimg))
 #layout = row(p, column(divimg,table))
 # curdoc - returns documents for current default state 
 
