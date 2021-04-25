@@ -17,6 +17,7 @@ from bokeh.plotting import figure
 from bokeh.models import IndexFilter, CDSView, GroupFilter, TapTool, PanTool, CustomJS, Div, ColumnDataSource, GeoJSONDataSource, LinearColorMapper, ColorBar, ResetTool, HoverTool, WheelZoomTool, SaveTool, BoxZoomTool
 from bokeh.palettes import brewer, Category20c
 from bokeh.layouts import column, gridplot, row
+from bokeh.models.widgets import DataTable, TableColumn
 import geopandas as gpd
 import pyodbc
 
@@ -51,18 +52,32 @@ all_orders.drop('level_0', axis = 1, inplace = True)
 # and summed 
 grouped_country_sum = sql_data('View_1', **serverargs, geodata = True)
 
+def add_percent(row):
+    # create new column that holds what percent of the total is the sale 
+    if isinstance(row['SumOrder'], float):
+        return ((row['SumOrder']/total_order)*100).round(3)
+
+
 min_order = grouped_country_sum['SumOrder'].min()
 max_order = grouped_country_sum['SumOrder'].max()
 average_order = grouped_country_sum['SumOrder'].mean()
 total_order = grouped_country_sum['SumOrder'].sum()
 
+
+grouped_country_sum['PercentTotal'] = grouped_country_sum.apply(lambda row: add_percent(row), axis=1)
+
+#groupedsource = ColumnDataSource(grouped_country_sum)
+
+
 def json_data(merged): 
     # in geopandas, fillna is to fill the na rows with a GEOMETRY 
     merged['SumOrder'].fillna('No data', inplace = True)
+    merged['PercentTotal'].fillna('No data', inplace = True)
     merged_json = json.loads(merged.to_json())
     json_data = json.dumps(merged_json)
     return json_data
 
+json_example = json_data(grouped_country_sum)
 
 ### bokeh part 
 #Input GeoJSON source that contains features for plotting.
@@ -74,24 +89,56 @@ palette = palette[::-1]
 #Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
 color_mapper = LinearColorMapper(palette = palette, low = min_order, high = max_order, nan_color = '#d9d9d9')   # change these later
 
-#Define custom tick labels for color bar.
-#tick_labels = {'0': '0%', '5': '5%', '10':'10%', '15':'15%', '20':'20%', '25':'25%', '30':'30%','35':'35%', '40': '>40%'}
 
 #Add hover tool                                        
 # tooltips - what will be displayed when hover 
-hover = HoverTool(tooltips = [ ('Country','@country'),('Total sum', '@SumOrder')])
+hover = HoverTool(tooltips = [('Държава','@country'),
+                              ('Сума продажби', '@SumOrder'),
+                              ('Процент от общи', '@PercentTotal{0.00 a}')])
 
+
+#geosource.selected('indices',get_customjs(geosource))
+
+def get_stats(iso):    ## the event should extract the country or the code 
+    #iso = grouped_country_sum.loc[index, 'ISOA2_code']
+    selected = all_orders.loc[all_orders['ISOA2_code'] == iso]
+    percentoftotal = ((selected['Order_Summary'].sum())/total_order)*100
+    top3 = selected.sort_values(by = ['Order_Summary'], ascending = False).head(3)
+    #print(top3['City'])
+    top3percent = (top3['Order_Summary'].sum()/selected['Order_Summary'].sum())*100    
+    country = selected.iloc[0]['Country']
+    selected_stats = {
+        'percent': [percentoftotal],
+        'top3': [client for client in top3['City']],
+        'percentTop3': [top3percent]
+        }
+    selectedsource = ColumnDataSource(selected_stats)
+    return selectedsource
+
+def get_customjs(source):  # simple example
+    callback = CustomJS(args=dict(source = source), code = """ 
+                    var index = source.selected.indices
+                    var iso = source.data["ISOA2_code"][index]
+                    console.log(iso)
+                                """)
+    return callback 
+
+taptool = TapTool(callback = get_customjs(geosource))
 
 
 #Create color bar. 
 color_bar = ColorBar(color_mapper=color_mapper, label_standoff=8,width = 500, height = 20,
                      border_line_color=None,location = (0,0), orientation = 'horizontal') 
                      #major_label_overrides = tick_labels)
+
+
+
 #Create figure object.
-p = figure(title = 'Общи продажби по държави', plot_height = 600 , 
+p = figure(title = 'Общи продажби по държави', plot_height = 600, 
            plot_width = 1000, sizing_mode='scale_width', 
            toolbar_location = 'above', 
-           tools = [hover, PanTool(), BoxZoomTool(match_aspect = True), SaveTool(), ResetTool()])
+           tools = [hover, taptool, PanTool(), BoxZoomTool(match_aspect = True), SaveTool(), ResetTool()])
+
 
 
 #Specify figure layout.
@@ -116,18 +163,15 @@ https://stackoverflow.com/questions/57514061/how-can-i-add-a-simple-png-picture-
 
 '''
 divimg = Div(text = """<a href="https://v05.bg"><img src = 'static/Victoria_logo.png'></a>""", 
-          default_size = 100)
-
-divstats = Div()
+          default_size = 50)
 
 # attribute (iso code)
 attrs = ['ISOA2_code']
 
 # Make a column layout of widgetbox(slider) and plot, and add it to the current document
 
-layout = column(row(p, divimg))
-#layout = pie
-
+layout = column(row(p, divimg), table)
+#layout = row(p, column(divimg,table))
 # curdoc - returns documents for current default state 
 
 curdoc().add_root(layout)
