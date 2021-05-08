@@ -98,26 +98,6 @@ hover = HoverTool(tooltips = [('Държава','@country'),
 
 
 
-def get_stats(iso):    ## the event should extract the country or the code 
-    #iso = grouped_country_sum.loc[index, 'ISOA2_code']
-    selected = all_orders.loc[all_orders['ISOA2_code'] == iso]
-    #percentoftotal = ((selected['Order_Summary'].sum())/total_order)*100
-    top3 = selected.sort_values(by = ['Order_Summary'], ascending = False).head(3)
-    #print(top3['City'])
-    top3percent = (top3['Order_Summary'].sum()/selected['Order_Summary'].sum())*100    
-    country = selected.iloc[0]['Country']
-    return top3, top3percent, top3percent
-
-def get_customjs(source):  # simple example
-    callback = CustomJS(args=dict(source = source), code = """ 
-                    var index = source.selected.indices
-                    var iso = source.data["ISOA2_code"][index]
-                    console.log(iso)
-                                """)
-    return callback 
-
-taptool = TapTool(callback = get_customjs(geosource))
-
 #Create color bar. 
 color_bar = ColorBar(color_mapper=color_mapper, label_standoff=8,width = 500, height = 20,
                      border_line_color=None,location = (0,0), orientation = 'horizontal') 
@@ -127,7 +107,7 @@ color_bar = ColorBar(color_mapper=color_mapper, label_standoff=8,width = 500, he
 p = figure(title = 'Общи продажби по държави', plot_height = 600, 
            plot_width = 1000, sizing_mode='scale_width', 
            toolbar_location = 'above', 
-           tools = [hover, taptool, PanTool(), BoxZoomTool(match_aspect = True), SaveTool(), ResetTool()])
+           tools = [hover, PanTool(), BoxZoomTool(match_aspect = True), SaveTool(), ResetTool()])
 
 #Specify figure layout.
 p.add_layout(color_bar, 'below')
@@ -140,17 +120,9 @@ p.ygrid.grid_line_color = None
 cr = p.patches('xs','ys', source = geosource,fill_color = {'field' :'SumOrder', 'transform' : color_mapper},
           line_color = 'black', line_width = 0.25, fill_alpha = 1)
 
-'''
 
-directory format bokeh
-
-static images
-https://stackoverflow.com/questions/57514061/how-can-i-add-a-simple-png-picture-to-my-bokeh-website
-
-'''
 divimg = Div(text = """<a href="https://v05.bg"><img src = 'static/Victoria_logo.png'></a>""", 
           default_size = 50)
-
 
 
 layout = column(row(p, divimg))
