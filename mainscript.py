@@ -97,23 +97,16 @@ hover = HoverTool(tooltips = [('Държава','@country'),
                               ('Процент от общи', '@PercentTotal{0.00 a}')])
 
 
-#geosource.selected('indices',get_customjs(geosource))
 
 def get_stats(iso):    ## the event should extract the country or the code 
     #iso = grouped_country_sum.loc[index, 'ISOA2_code']
     selected = all_orders.loc[all_orders['ISOA2_code'] == iso]
-    percentoftotal = ((selected['Order_Summary'].sum())/total_order)*100
+    #percentoftotal = ((selected['Order_Summary'].sum())/total_order)*100
     top3 = selected.sort_values(by = ['Order_Summary'], ascending = False).head(3)
     #print(top3['City'])
     top3percent = (top3['Order_Summary'].sum()/selected['Order_Summary'].sum())*100    
     country = selected.iloc[0]['Country']
-    selected_stats = {
-        'percent': [percentoftotal],
-        'top3': [client for client in top3['City']],
-        'percentTop3': [top3percent]
-        }
-    selectedsource = ColumnDataSource(selected_stats)
-    return selectedsource
+    return top3, top3percent, top3percent
 
 def get_customjs(source):  # simple example
     callback = CustomJS(args=dict(source = source), code = """ 
@@ -125,13 +118,10 @@ def get_customjs(source):  # simple example
 
 taptool = TapTool(callback = get_customjs(geosource))
 
-
 #Create color bar. 
 color_bar = ColorBar(color_mapper=color_mapper, label_standoff=8,width = 500, height = 20,
                      border_line_color=None,location = (0,0), orientation = 'horizontal') 
                      #major_label_overrides = tick_labels)
-
-
 
 #Create figure object.
 p = figure(title = 'Общи продажби по държави', plot_height = 600, 
@@ -139,11 +129,8 @@ p = figure(title = 'Общи продажби по държави', plot_height 
            toolbar_location = 'above', 
            tools = [hover, taptool, PanTool(), BoxZoomTool(match_aspect = True), SaveTool(), ResetTool()])
 
-
-
 #Specify figure layout.
 p.add_layout(color_bar, 'below')
-
 
 #p.toolbar.active_drag = 
 p.xgrid.grid_line_color = None
@@ -152,7 +139,6 @@ p.ygrid.grid_line_color = None
 #Add patch renderer to figure.                                  
 cr = p.patches('xs','ys', source = geosource,fill_color = {'field' :'SumOrder', 'transform' : color_mapper},
           line_color = 'black', line_width = 0.25, fill_alpha = 1)
-
 
 '''
 
@@ -165,10 +151,7 @@ https://stackoverflow.com/questions/57514061/how-can-i-add-a-simple-png-picture-
 divimg = Div(text = """<a href="https://v05.bg"><img src = 'static/Victoria_logo.png'></a>""", 
           default_size = 50)
 
-# attribute (iso code)
-attrs = ['ISOA2_code']
 
-# Make a column layout of widgetbox(slider) and plot, and add it to the current document
 
 layout = column(row(p, divimg))
 #layout = row(p, column(divimg,table))
